@@ -1,0 +1,6 @@
+{
+  "name": "PortfolioLab",
+  "description": "Simulador profesional de inversiones con fondos indexados, cuentas remuneradas y simulación de Monte Carlo en español.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
