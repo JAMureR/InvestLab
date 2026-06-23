@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { RemuneratedAccount, SimulationParams } from "../types";
 import { CATALOG_ACCOUNTS } from "../utils/finance";
+import SavedSimulationsPanel from "./SavedSimulationsPanel";
 
 interface RemuneradasScreenProps {
   params: SimulationParams;
@@ -229,6 +230,28 @@ export default function RemuneradasScreen({ params, onSetParams }: RemuneradasSc
               </div>
             </div>
           )}
+
+          {/* Saved Simulations Panel */}
+          <SavedSimulationsPanel
+            simulationType="remuneradas"
+            currentParams={{
+              capitalInicial: capInicial,
+              aportacionMensual: aporteMensual,
+              tiempoAnios: anios,
+              interesAnual: selectedAcc?.percentageTAE || 0,
+              inflacionAnual: 2.0,
+              volatilidadAnual: 0.5,
+              perfilRiesgo: "conservador"
+            }}
+            onLoadSimulation={(loaded) => {
+              setCapInicial(loaded.capitalInicial);
+              setAporteMensual(loaded.aportacionMensual);
+              setAnios(loaded.tiempoAnios);
+              setHasSimulated(false);
+              onSetParams(loaded);
+            }}
+            selectedAccountId={selectedAcc?.id}
+          />
         </div>
 
         {/* RIGHT: Simulator panel */}

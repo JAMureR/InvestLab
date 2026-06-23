@@ -16,6 +16,7 @@ import {
 import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
 import { IndexFund, SimulationParams, SimulationResults } from "../types";
 import { CATALOG_FUNDS, ejecutarSimulacion } from "../utils/finance";
+import SavedSimulationsPanel from "./SavedSimulationsPanel";
 
 interface IndexadosScreenProps {
   params: SimulationParams;
@@ -187,6 +188,20 @@ export default function IndexadosScreen({ params, onSetParams }: IndexadosScreen
               );
             })}
           </div>
+
+          {/* Saved Simulations Panel */}
+          <SavedSimulationsPanel
+            simulationType="indexados"
+            currentParams={computedParams}
+            onLoadSimulation={(loaded) => {
+              setCapInicial(loaded.capitalInicial);
+              setAporteMensual(loaded.aportacionMensual);
+              setAnios(loaded.tiempoAnios);
+              setHasSimulated(false);
+              onSetParams(loaded);
+            }}
+            selectedFundId={selectedFund?.id}
+          />
         </div>
 
         {/* CENTER+RIGHT: Simulator panel */}

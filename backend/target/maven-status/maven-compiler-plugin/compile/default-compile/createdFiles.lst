@@ -1,9 +1,0 @@
-com\javiermuredev\investlab\InvestLabApplication.class
-com\javiermuredev\investlab\repository\RemuneratedAccountRepository.class
-com\javiermuredev\investlab\controller\FundController.class
-com\javiermuredev\investlab\model\RemuneratedAccount.class
-com\javiermuredev\investlab\controller\AccountController.class
-com\javiermuredev\investlab\repository\IndexFundRepository.class
-com\javiermuredev\investlab\config\CorsConfig$1.class
-com\javiermuredev\investlab\config\CorsConfig.class
-com\javiermuredev\investlab\model\IndexFund.class

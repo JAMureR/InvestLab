@@ -14,6 +14,7 @@ import {
 import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
 import { SimulationParams, SimulationResults } from "../types";
 import { ejecutarSimulacion } from "../utils/finance";
+import SavedSimulationsPanel from "./SavedSimulationsPanel";
 
 interface SimuladorScreenProps {
   params: SimulationParams;
@@ -320,6 +321,22 @@ export default function SimuladorScreen({ params, onSetParams }: SimuladorScreen
             )}
           </button>
         </div>
+
+        {/* Saved Simulations Panel */}
+        <SavedSimulationsPanel
+          simulationType="simulador"
+          currentParams={computedParams}
+          onLoadSimulation={(loaded) => {
+            setCapInicial(loaded.capitalInicial);
+            setAporteMensual(loaded.aportacionMensual);
+            setAnios(loaded.tiempoAnios);
+            setInteres(loaded.interesAnual);
+            setInflacion(loaded.inflacionAnual);
+            setVolatilidad(loaded.volatilidadAnual);
+            setPerfil(loaded.perfilRiesgo);
+            onSetParams(loaded);
+          }}
+        />
       </section>
 
       {/* Main Canvas chart reports */}

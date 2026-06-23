@@ -1,16 +1,31 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Menu } from "lucide-react";
 
 import { SimulationParams, ViewType } from "./types";
+import { getStoredUser, logout, isAuthenticated } from "./utils/api";
 import LandingPage from "./components/LandingPage";
 import Sidebar from "./components/Sidebar";
 import SimuladorScreen from "./components/SimuladorScreen";
 import IndexadosScreen from "./components/IndexadosScreen";
 import RemuneradasScreen from "./components/RemuneradasScreen";
+import AuthModal from "./components/AuthModal";
 
 export default function App() {
   const [isLanding, setIsLanding] = useState(true);
   const [activeView, setActiveView] = useState<ViewType>("simulador");
+
+  // Auth state
+  const [user, setUser] = useState<{ username: string; email: string } | null>(getStoredUser());
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Listen for auth expiration events (from api.ts)
+  useEffect(() => {
+    const handleExpired = () => {
+      setUser(null);
+    };
+    window.addEventListener("auth_expired", handleExpired);
+    return () => window.removeEventListener("auth_expired", handleExpired);
+  }, []);
 
   // Global simulation params (shared across screens if needed)
   const [params, setParams] = useState<SimulationParams>({
@@ -27,6 +42,15 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  const handleLogout = () => {
+    logout();
+    setUser(null);
+  };
+
+  const handleAuthSuccess = (userData: { username: string; email: string }) => {
+    setUser(userData);
+  };
+
   const renderViewContent = () => {
     switch (activeView) {
       case "simulador":
@@ -42,12 +66,19 @@ export default function App() {
 
   if (isLanding) {
     return (
-      <LandingPage
-        onEnterSimulator={(view) => {
-          setIsLanding(false);
-          if (view) setActiveView(view);
-        }}
-      />
+      <>
+        <LandingPage
+          onEnterSimulator={(view) => {
+            setIsLanding(false);
+            if (view) setActiveView(view);
+          }}
+        />
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onAuthSuccess={handleAuthSuccess}
+        />
+      </>
     );
   }
 
@@ -62,6 +93,9 @@ export default function App() {
         onExit={() => setIsLanding(true)}
         collapsed={sidebarCollapsed}
         setCollapsed={setSidebarCollapsed}
+        user={user}
+        onLoginClick={() => setShowAuthModal(true)}
+        onLogout={handleLogout}
       />
 
       <div className={`flex-1 min-w-0 flex flex-col min-h-screen relative transition-all duration-300 ${
@@ -81,9 +115,23 @@ export default function App() {
               {activeView === "remuneradas" && "Simulador de Cuentas Remuneradas"}
             </h2>
           </div>
-          <span className="inline-flex bg-[#4edea3]/10 border border-[#4edea3]/20 py-1.5 px-3 rounded-lg text-[10px] font-mono tracking-wide font-semibold text-[#4edea3] uppercase">
-            INVESTLAB
-          </span>
+          <div className="flex items-center gap-3">
+            {user ? (
+              <span className="text-xs font-mono text-[#bbcabf]">
+                <span className="text-[#4edea3] font-bold">{user.username}</span>
+              </span>
+            ) : (
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="text-xs font-semibold text-[#bbcabf] hover:text-[#4edea3] transition-colors cursor-pointer"
+              >
+                Iniciar Sesión
+              </button>
+            )}
+            <span className="inline-flex bg-[#4edea3]/10 border border-[#4edea3]/20 py-1.5 px-3 rounded-lg text-[10px] font-mono tracking-wide font-semibold text-[#4edea3] uppercase">
+              INVESTLAB
+            </span>
+          </div>
         </header>
 
         {mobileMenuOpen && (
@@ -106,6 +154,21 @@ export default function App() {
                 {item.label}
               </button>
             ))}
+            {user ? (
+              <button
+                onClick={handleLogout}
+                className="w-full text-center py-3 px-4 rounded-xl bg-red-500/10 text-red-300 font-bold text-xs mt-2"
+              >
+                Cerrar Sesión ({user.username})
+              </button>
+            ) : (
+              <button
+                onClick={() => { setShowAuthModal(true); setMobileMenuOpen(false); }}
+                className="w-full text-center py-3 px-4 rounded-xl bg-[#4edea3]/10 text-[#4edea3] font-bold text-xs mt-2"
+              >
+                Iniciar Sesión
+              </button>
+            )}
             <button
               onClick={() => setIsLanding(true)}
               className="w-full text-center py-3 px-4 rounded-xl bg-red-500/10 text-red-300 font-bold text-xs mt-6"
@@ -121,6 +184,12 @@ export default function App() {
           </div>
         </main>
       </div>
+
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onAuthSuccess={handleAuthSuccess}
+      />
     </div>
   );
 }

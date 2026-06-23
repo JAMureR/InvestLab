@@ -4,9 +4,10 @@ import {
   Coins,
   ChevronLeft,
   ChevronRight,
-  LogOut
+  LogOut,
+  LogIn,
+  User
 } from "lucide-react";
-import { useState } from "react";
 import { ViewType } from "../types";
 
 interface SidebarProps {
@@ -15,6 +16,9 @@ interface SidebarProps {
   onExit: () => void;
   collapsed: boolean;
   setCollapsed: (collapsed: boolean) => void;
+  user: { username: string; email: string } | null;
+  onLoginClick: () => void;
+  onLogout: () => void;
 }
 
 export default function Sidebar({
@@ -22,7 +26,10 @@ export default function Sidebar({
   onChangeView,
   onExit,
   collapsed,
-  setCollapsed
+  setCollapsed,
+  user,
+  onLoginClick,
+  onLogout
 }: SidebarProps) {
   const menuItems = [
     { id: "simulador", label: "Simulador Inversiones", icon: LineChart },
@@ -84,8 +91,48 @@ export default function Sidebar({
         })}
       </nav>
 
-      {/* Sidebar Footer */}
-      <div className="px-4 mt-auto border-t border-[#1e293b]/70 pt-4">
+      {/* User section */}
+      <div className="px-4 mt-auto border-t border-[#1e293b]/70 pt-4 space-y-2">
+        {user ? (
+          <>
+            {!collapsed && (
+              <div className="flex items-center gap-3 px-3 py-2">
+                <div className="w-8 h-8 rounded-full bg-[#4edea3]/20 flex items-center justify-center flex-shrink-0">
+                  <User className="w-4 h-4 text-[#4edea3]" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-white truncate">{user.username}</p>
+                  <p className="text-[10px] text-[#bbcabf] truncate">{user.email}</p>
+                </div>
+              </div>
+            )}
+            {collapsed && (
+              <div className="flex justify-center">
+                <div className="w-8 h-8 rounded-full bg-[#4edea3]/20 flex items-center justify-center">
+                  <User className="w-4 h-4 text-[#4edea3]" />
+                </div>
+              </div>
+            )}
+            <button
+              onClick={onLogout}
+              className="w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl hover:bg-red-500/10 hover:text-red-300 text-[#bbcabf] text-xs font-medium cursor-pointer transition-colors"
+              title="Cerrar Sesión"
+            >
+              <LogOut className="w-4 h-4 flex-shrink-0" />
+              {!collapsed && <span>Cerrar Sesión</span>}
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={onLoginClick}
+            className="w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl hover:bg-[#4edea3]/10 hover:text-[#4edea3] text-[#bbcabf] text-xs font-medium cursor-pointer transition-colors"
+            title="Iniciar Sesión"
+          >
+            <LogIn className="w-4 h-4 flex-shrink-0" />
+            {!collapsed && <span>Iniciar Sesión</span>}
+          </button>
+        )}
+
         <button
           onClick={onExit}
           className="w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl hover:bg-red-500/10 hover:text-red-300 text-[#bbcabf] text-xs font-medium cursor-pointer transition-colors"
