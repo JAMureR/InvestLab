@@ -244,3 +244,54 @@ export async function deleteAccount(id: string): Promise<void> {
   });
   if (!res.ok) throw new Error('Error al eliminar cuenta remunerada');
 }
+
+// ===== ADMIN USER CRUD =====
+
+export interface UserDTO {
+  id?: number;
+  username: string;
+  email: string;
+  role: string;
+  createdAt?: string;
+  password?: string;
+}
+
+export async function getUsers(): Promise<UserDTO[]> {
+  const res = await fetchWithAuth('/users');
+  if (!res.ok) throw new Error('Error al obtener usuarios');
+  return res.json();
+}
+
+export async function createUser(payload: UserDTO): Promise<UserDTO> {
+  const res = await fetchWithAuth('/users', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || 'Error al crear usuario');
+  }
+  return res.json();
+}
+
+export async function updateUser(id: number, payload: UserDTO): Promise<UserDTO> {
+  const res = await fetchWithAuth(`/users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || 'Error al actualizar usuario');
+  }
+  return res.json();
+}
+
+export async function deleteUser(id: number): Promise<void> {
+  const res = await fetchWithAuth(`/users/${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || 'Error al eliminar usuario');
+  }
+}

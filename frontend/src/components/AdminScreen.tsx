@@ -1,22 +1,29 @@
 import React, { useState, useEffect } from "react";
-import { Edit, Trash2, Plus, X, Save, AlertTriangle } from "lucide-react";
+import { Edit, Trash2, Plus, X, Save, AlertTriangle, Shield, User as UserIcon } from "lucide-react";
 import { 
   IndexFundDTO, 
   RemuneratedAccountDTO, 
+  UserDTO,
   createFund, 
   updateFund, 
   deleteFund, 
   createAccount, 
   updateAccount, 
-  deleteAccount 
+  deleteAccount,
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  getStoredUser
 } from "../utils/api";
 
 export default function AdminScreen() {
-  const [activeTab, setActiveTab] = useState<"funds" | "accounts">("funds");
+  const [activeTab, setActiveTab] = useState<"funds" | "accounts" | "users">("funds");
   
   // Data lists
   const [funds, setFunds] = useState<IndexFundDTO[]>([]);
   const [accounts, setAccounts] = useState<RemuneratedAccountDTO[]>([]);
+  const [users, setUsers] = useState<UserDTO[]>([]);
   
   // States
   const [loading, setLoading] = useState(false);
@@ -27,6 +34,14 @@ export default function AdminScreen() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null); // null means creating
   
+  // Custom Delete Confirmation states
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [targetDeleteId, setTargetDeleteId] = useState<any>(null);
+  const [targetDeleteName, setTargetDeleteName] = useState<string>("");
+  
+  // Current logged in user info
+  const currentUser = getStoredUser();
+
   // Fund Form fields
   const [fundForm, setFundForm] = useState<IndexFundDTO>({
     id: "",
@@ -54,6 +69,14 @@ export default function AdminScreen() {
     conditions: ""
   });
 
+  // User Form fields
+  const [userForm, setUserForm] = useState<UserDTO>({
+    username: "",
+    email: "",
+    role: "ROLE_USER",
+    password: ""
+  });
+
   // Fetch initial data
   const fetchData = async () => {
     setLoading(true);
@@ -68,8 +91,12 @@ export default function AdminScreen() {
       
       setFunds(await fundsRes.json());
       setAccounts(await accountsRes.json());
+      
+      // Fetch users list
+      const usersData = await getUsers();
+      setUsers(usersData);
     } catch (err: any) {
-      setError(err.message || "Error al conectar con el servidor");
+      setError(err.message || "Error al conectar con el servidor o cargar usuarios");
     } finally {
       setLoading(false);
     }
@@ -82,10 +109,12 @@ export default function AdminScreen() {
   const showToast = (message: string, isSuccess = true) => {
     if (isSuccess) {
       setSuccessMsg(message);
-      setTimeout(() => setSuccessMsg(null), 4000);
+      setError(null);
+      setTimeout(() => setSuccessMsg(null), 4500);
     } else {
       setError(message);
-      setTimeout(() => setError(null), 5000);
+      setSuccessMsg(null);
+      setTimeout(() => setError(null), 5500);
     }
   };
 
@@ -108,7 +137,7 @@ export default function AdminScreen() {
         volatility: 12,
         beta: 1.0
       });
-    } else {
+    } else if (activeTab === "accounts") {
       setAccountForm({
         id: "",
         name: "",
@@ -117,6 +146,13 @@ export default function AdminScreen() {
         liquidity: "Inmediata",
         riskRating: 1,
         conditions: "Sin comisiones de mantenimiento."
+      });
+    } else {
+      setUserForm({
+        username: "",
+        email: "",
+        role: "ROLE_USER",
+        password: ""
       });
     }
     setIsModalOpen(true);
@@ -129,32 +165,63 @@ export default function AdminScreen() {
       const fund = item as IndexFundDTO;
       setEditingId(fund.id || null);
       setFundForm({ ...fund });
-    } else {
+    } else if (activeTab === "accounts") {
       const acc = item as RemuneratedAccountDTO;
       setEditingId(acc.id || null);
       setAccountForm({ ...acc });
+    } else {
+      const u = item as UserDTO;
+      setEditingId(u.id ? String(u.id) : null);
+      setUserForm({ 
+        username: u.username,
+        email: u.email,
+        role: u.role,
+        password: "" // Empty by default on edit
+      });
     }
     setIsModalOpen(true);
   };
 
-  // Handle delete
-  const handleDelete = async (id: string | undefined) => {
+  // Prompt delete confirmation modal
+  const promptDelete = (id: any, name: string) => {
     if (!id) return;
-    if (!window.confirm("¿Estás seguro de que quieres eliminar este producto del catálogo?")) return;
+    
+    if (activeTab === "users") {
+      const u = users.find(x => x.id === id);
+      if (currentUser && u && currentUser.username === u.username) {
+        showToast("No puedes eliminar tu propia cuenta de administrador activa.", false);
+        return;
+      }
+    }
+    setTargetDeleteId(id);
+    setTargetDeleteName(name);
+    setDeleteConfirmOpen(true);
+  };
+
+  // Perform actual deletion
+  const confirmDelete = async () => {
+    if (!targetDeleteId) return;
     
     setLoading(true);
     try {
       if (activeTab === "funds") {
-        await deleteFund(id);
-        setFunds(funds.filter(f => f.id !== id));
+        await deleteFund(targetDeleteId);
+        setFunds(funds.filter(f => f.id !== targetDeleteId));
         showToast("Fondo indexado eliminado con éxito");
-      } else {
-        await deleteAccount(id);
-        setAccounts(accounts.filter(a => a.id !== id));
+      } else if (activeTab === "accounts") {
+        await deleteAccount(targetDeleteId);
+        setAccounts(accounts.filter(a => a.id !== targetDeleteId));
         showToast("Cuenta remunerada eliminada con éxito");
+      } else {
+        await deleteUser(Number(targetDeleteId));
+        setUsers(users.filter(u => u.id !== Number(targetDeleteId)));
+        showToast("Usuario eliminado con éxito");
       }
+      setDeleteConfirmOpen(false);
+      setTargetDeleteId(null);
+      setTargetDeleteName("");
     } catch (err: any) {
-      showToast(err.message || "Error al eliminar el producto", false);
+      showToast(err.message || "Error al eliminar el producto/usuario", false);
     } finally {
       setLoading(false);
     }
@@ -169,27 +236,43 @@ export default function AdminScreen() {
     try {
       if (activeTab === "funds") {
         if (editingId) {
-          // Update
           const updated = await updateFund(editingId, fundForm);
           setFunds(funds.map(f => f.id === editingId ? updated : f));
           showToast("Fondo indexado actualizado con éxito");
         } else {
-          // Create
           const created = await createFund(fundForm);
           setFunds([...funds, created]);
           showToast("Fondo indexado creado con éxito");
         }
-      } else {
+      } else if (activeTab === "accounts") {
         if (editingId) {
-          // Update
           const updated = await updateAccount(editingId, accountForm);
           setAccounts(accounts.map(a => a.id === editingId ? updated : a));
           showToast("Cuenta remunerada actualizada con éxito");
         } else {
-          // Create
           const created = await createAccount(accountForm);
           setAccounts([...accounts, created]);
-          showToast("Cuenta remunerada creada con éxito");
+          showToast("Cuenta remunerada creado con éxito");
+        }
+      } else {
+        // Users
+        if (editingId) {
+          // El propio usuario administrador no puede quitarse su rol admin
+          const u = users.find(x => x.id === Number(editingId));
+          if (currentUser && u && currentUser.username === u.username && userForm.role !== "ROLE_ADMIN") {
+            throw new Error("No puedes quitarte el rol ADMIN a ti mismo para evitar bloqueos.");
+          }
+
+          const updated = await updateUser(Number(editingId), userForm);
+          setUsers(users.map(u => u.id === Number(editingId) ? updated : u));
+          showToast("Usuario actualizado con éxito");
+        } else {
+          if (!userForm.password || userForm.password.trim() === "") {
+            throw new Error("La contraseña es obligatoria para nuevos usuarios.");
+          }
+          const created = await createUser(userForm);
+          setUsers([...users, created]);
+          showToast("Usuario creado con éxito");
         }
       }
       setIsModalOpen(false);
@@ -207,7 +290,7 @@ export default function AdminScreen() {
         <div>
           <h1 className="text-xl font-extrabold text-white">Panel de Administración</h1>
           <p className="text-xs text-[#a3b3cc] mt-1">
-            Gestiona el catálogo global de fondos indexados y cuentas remuneradas que consumen los simuladores.
+            Gestiona el catálogo global de productos de inversión y los perfiles de usuarios registrados.
           </p>
         </div>
         <button
@@ -215,7 +298,7 @@ export default function AdminScreen() {
           className="flex items-center gap-2 px-4 py-2 bg-[#4edea3] hover:bg-[#3ec48e] text-black font-bold text-xs rounded-xl shadow-lg shadow-[#4edea3]/10 hover:shadow-[#4edea3]/20 transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          Añadir Producto
+          Añadir {activeTab === "users" ? "Usuario" : "Producto"}
         </button>
       </div>
 
@@ -255,12 +338,22 @@ export default function AdminScreen() {
         >
           Cuentas Remuneradas ({accounts.length})
         </button>
+        <button
+          onClick={() => { setActiveTab("users"); setError(null); }}
+          className={`pb-3 px-6 text-xs font-bold transition-all relative ${
+            activeTab === "users" 
+              ? "text-[#4edea3] border-b-2 border-[#4edea3]" 
+              : "text-[#a3b3cc] hover:text-white"
+          }`}
+        >
+          Gestión de Usuarios ({users.length})
+        </button>
       </div>
 
       {/* Table Container */}
       <div className="bg-[#0b1326]/60 border border-[#1e293b]/70 rounded-2xl overflow-hidden backdrop-blur-md">
-        {loading && funds.length === 0 && accounts.length === 0 ? (
-          <div className="p-12 text-center text-xs text-[#a3b3cc]">Cargando catálogo de productos...</div>
+        {loading && funds.length === 0 && accounts.length === 0 && users.length === 0 ? (
+          <div className="p-12 text-center text-xs text-[#a3b3cc]">Cargando catálogo...</div>
         ) : activeTab === "funds" ? (
           /* FUNDS TABLE */
           <div className="overflow-x-auto">
@@ -310,7 +403,7 @@ export default function AdminScreen() {
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleDelete(fund.id)}
+                          onClick={() => promptDelete(fund.id, fund.name)}
                           className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors cursor-pointer"
                           title="Eliminar"
                         >
@@ -323,7 +416,7 @@ export default function AdminScreen() {
               </tbody>
             </table>
           </div>
-        ) : (
+        ) : activeTab === "accounts" ? (
           /* ACCOUNTS TABLE */
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
@@ -369,7 +462,7 @@ export default function AdminScreen() {
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleDelete(acc.id)}
+                          onClick={() => promptDelete(acc.id, acc.name)}
                           className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors cursor-pointer"
                           title="Eliminar"
                         >
@@ -379,6 +472,91 @@ export default function AdminScreen() {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* USERS TABLE */
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-[#020617]/50 border-b border-[#1e293b]/50 text-[#a3b3cc] font-semibold">
+                  <th className="p-4">ID / Nombre de Usuario</th>
+                  <th className="p-4">Correo Electrónico</th>
+                  <th className="p-4 text-center">Rol de Acceso</th>
+                  <th className="p-4">Fecha Registro</th>
+                  <th className="p-4 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#1e293b]/40">
+                {users.map((u) => {
+                  const isSelf = currentUser?.username === u.username;
+                  return (
+                    <tr key={u.id} className="hover:bg-slate-900/30 transition-colors">
+                      <td className="p-4 font-bold text-white max-w-[200px] truncate flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center">
+                          <UserIcon className="w-3.5 h-3.5 text-slate-400" />
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-mono text-[#a3b3cc]">ID: {u.id}</div>
+                          <div className="flex items-center gap-1.5">
+                            {u.username}
+                            {isSelf && (
+                              <span className="text-[8px] bg-[#4edea3]/10 border border-[#4edea3]/20 text-[#4edea3] px-1 rounded uppercase tracking-wider font-bold">
+                                Tú
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4 font-mono text-slate-300">{u.email}</td>
+                      <td className="p-4 text-center">
+                        {u.role === "ROLE_ADMIN" ? (
+                          <span className="inline-flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400 px-2 py-0.5 rounded font-bold uppercase tracking-wider text-[9px]">
+                            <Shield className="w-2.5 h-2.5" />
+                            Admin
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2 py-0.5 rounded font-bold uppercase tracking-wider text-[9px]">
+                            Usuario
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 text-slate-400 font-mono">
+                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString("es-ES", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit"
+                        }) : "-"}
+                      </td>
+                      <td className="p-4 text-center">
+                        <div className="flex justify-center gap-2">
+                          <button
+                            onClick={() => handleOpenEdit(u)}
+                            className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-colors cursor-pointer"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => promptDelete(u.id, u.username)}
+                            disabled={isSelf}
+                            className={`p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 transition-colors ${
+                              isSelf 
+                                ? "opacity-30 cursor-not-allowed" 
+                                : "hover:bg-red-500/20 hover:text-red-300 cursor-pointer"
+                            }`}
+                            title={isSelf ? "No puedes eliminarte a ti mismo" : "Eliminar"}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -393,7 +571,7 @@ export default function AdminScreen() {
             <div className="flex justify-between items-center border-b border-[#1e293b]/60 pb-3">
               <h2 className="text-sm font-bold text-white">
                 {editingId ? "Editar " : "Añadir "}
-                {activeTab === "funds" ? "Fondo Indexado" : "Cuenta Remunerada"}
+                {activeTab === "users" ? "Usuario" : activeTab === "funds" ? "Fondo Indexado" : "Cuenta Remunerada"}
               </h2>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -404,8 +582,9 @@ export default function AdminScreen() {
             </div>
 
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 text-red-300 p-3 rounded-xl text-[11px] font-semibold">
-                {error}
+              <div className="bg-red-500/10 border border-red-500/30 text-red-300 p-3 rounded-xl text-[11px] font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
@@ -414,7 +593,6 @@ export default function AdminScreen() {
               {activeTab === "funds" ? (
                 /* FUND FORM FIELDS */
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* ID Field (Only editable when creating) */}
                   <div className="col-span-2">
                     <label className="block text-[10px] font-bold text-[#a3b3cc] mb-1.5 uppercase">ID Único (URL-friendly)</label>
                     <input
@@ -535,7 +713,7 @@ export default function AdminScreen() {
                       type="number"
                       step="0.1"
                       required
-                      value={fundForm.volatilidadAnual || fundForm.volatility || 0}
+                      value={fundForm.volatility}
                       onChange={(e) => setFundForm({ ...fundForm, volatility: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-[#020617]/50 border border-[#1e293b] rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[#4edea3]"
                     />
@@ -552,10 +730,9 @@ export default function AdminScreen() {
                     />
                   </div>
                 </div>
-              ) : (
+              ) : activeTab === "accounts" ? (
                 /* ACCOUNT FORM FIELDS */
                 <div className="space-y-4">
-                  {/* ID Field (Only editable when creating) */}
                   <div>
                     <label className="block text-[10px] font-bold text-[#a3b3cc] mb-1.5 uppercase">ID Único (URL-friendly)</label>
                     <input
@@ -640,6 +817,67 @@ export default function AdminScreen() {
                     />
                   </div>
                 </div>
+              ) : (
+                /* USER FORM FIELDS */
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#a3b3cc] mb-1.5 uppercase">Nombre de Usuario</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="nombre_usuario"
+                      value={userForm.username}
+                      onChange={(e) => setUserForm({ ...userForm, username: e.target.value })}
+                      className="w-full bg-[#020617]/50 border border-[#1e293b] rounded-xl px-4 py-2.5 text-white placeholder-slate-600 focus:outline-none focus:border-[#4edea3]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#a3b3cc] mb-1.5 uppercase">Correo Electrónico</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="usuario@email.com"
+                      value={userForm.email}
+                      onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                      className="w-full bg-[#020617]/50 border border-[#1e293b] rounded-xl px-4 py-2.5 text-white placeholder-slate-600 focus:outline-none focus:border-[#4edea3]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#a3b3cc] mb-1.5 uppercase">
+                      Contraseña {editingId && "(Opcional)"}
+                    </label>
+                    <input
+                      type="password"
+                      required={!editingId}
+                      placeholder={editingId ? "Dejar en blanco para no modificarla" : "•••••• (mínimo 6 caracteres)"}
+                      value={userForm.password}
+                      onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                      className="w-full bg-[#020617]/50 border border-[#1e293b] rounded-xl px-4 py-2.5 text-white placeholder-slate-600 focus:outline-none focus:border-[#4edea3]"
+                    />
+                    {editingId && (
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Si deseas cambiar la contraseña del usuario, escribe la nueva. De lo contrario, déjalo vacío.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#a3b3cc] mb-1.5 uppercase">Rol de Acceso</label>
+                    {currentUser?.username === userForm.username ? (
+                      <div className="w-full bg-[#1e293b]/30 border border-[#1e293b] text-red-400 font-bold rounded-xl px-4 py-2.5">
+                        ROLE_ADMIN (No puedes modificar tu propio rol)
+                      </div>
+                    ) : (
+                      <select
+                        value={userForm.role}
+                        onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
+                        className="w-full bg-[#020617] border border-[#1e293b] rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[#4edea3]"
+                      >
+                        <option value="ROLE_USER">Usuario Estándar (ROLE_USER)</option>
+                        <option value="ROLE_ADMIN">Administrador General (ROLE_ADMIN)</option>
+                      </select>
+                    )}
+                  </div>
+                </div>
               )}
 
               {/* Actions Buttons */}
@@ -657,10 +895,50 @@ export default function AdminScreen() {
                   className="flex items-center gap-2 px-5 py-2 bg-[#4edea3] hover:bg-[#3ec48e] text-black font-bold rounded-xl cursor-pointer disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
-                  {loading ? "Guardando..." : "Guardar Producto"}
+                  {loading ? "Guardando..." : "Guardar Cambios"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP MODAL (Custom Delete Confirmation) */}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#0b1326] border border-[#1e293b]/80 max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-red-400">
+              <AlertTriangle className="w-6 h-6 flex-shrink-0" />
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider">Confirmar Eliminación</h2>
+            </div>
+            
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {activeTab === "users" ? (
+                <span>¿Estás seguro de que quieres eliminar al usuario <strong className="text-white">'{targetDeleteName}'</strong>? Esta acción es irreversible y borrará todas sus simulaciones guardadas.</span>
+              ) : (
+                <span>¿Estás seguro de que quieres eliminar el producto <strong className="text-white">'{targetDeleteName}'</strong> del catálogo global?</span>
+              )}
+            </p>
+            
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                id="cancel-delete-btn"
+                onClick={() => { setDeleteConfirmOpen(false); setTargetDeleteId(null); setTargetDeleteName(""); }}
+                className="px-4 py-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 font-bold rounded-xl cursor-pointer text-xs"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                id="confirm-delete-btn"
+                onClick={confirmDelete}
+                disabled={loading}
+                className="px-5 py-2 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl cursor-pointer text-xs disabled:opacity-50"
+              >
+                {loading ? "Eliminando..." : "Eliminar"}
+              </button>
+            </div>
           </div>
         </div>
       )}
