@@ -5,16 +5,17 @@ import {
   Plus,
   Compass,
   Download,
-  Info,
-  CheckCircle,
-  HelpCircle,
-  Percent,
   AlertTriangle,
-  FolderOpen
+  Percent,
+  FolderOpen,
+  Play,
+  Activity,
+  Sliders,
+  Award
 } from "lucide-react";
-import { IndexFund, SimulationParams } from "../types";
-import { CATALOG_FUNDS } from "../utils/finance";
-import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
+import { IndexFund, SimulationParams, SimulationResults } from "../types";
+import { CATALOG_FUNDS, ejecutarSimulacion } from "../utils/finance";
 
 interface IndexadosScreenProps {
   params: SimulationParams;
@@ -23,352 +24,352 @@ interface IndexadosScreenProps {
 
 export default function IndexadosScreen({ params, onSetParams }: IndexadosScreenProps) {
   const [selectedRegion, setSelectedRegion] = useState("Todas las Regiones");
-  const [selectedAsset, setSelectedAsset] = useState("Todos");
   const [selectedFund, setSelectedFund] = useState<IndexFund | null>(CATALOG_FUNDS[0]);
-  const [copiedSuccess, setCopiedSuccess] = useState(false);
+
+  // Local simulator inputs
+  const [capInicial, setCapInicial] = useState(params.capitalInicial);
+  const [aporteMensual, setAporteMensual] = useState(params.aportacionMensual);
+  const [anios, setAnios] = useState(params.tiempoAnios);
+
+  // Simulation state
+  const [hasSimulated, setHasSimulated] = useState(false);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationProgress, setSimulationProgress] = useState(0);
 
   // Filter logic
   const filteredFunds = useMemo(() => {
     return CATALOG_FUNDS.filter((fund) => {
-      const regionMatch =
-        selectedRegion === "Todas las Regiones" || fund.region.toLowerCase() === selectedRegion.toLowerCase();
-      const assetMatch =
-        selectedAsset === "Todos" ||
-        (selectedAsset === "Renta Variable" && fund.category.includes("Renta Variable"));
-      return regionMatch && assetMatch;
+      return selectedRegion === "Todas las Regiones" || fund.region.toLowerCase() === selectedRegion.toLowerCase();
     });
-  }, [selectedRegion, selectedAsset]);
+  }, [selectedRegion]);
 
-  // Click on fund dynamically updates global simulation variables matching actual fund performance
   const handleSelectFund = (fund: IndexFund) => {
     setSelectedFund(fund);
-    onSetParams({
-      ...params,
-      interesAnual: fund.historicalReturn5Y, // use historical 5Y annualized returns as target rate
-      volatilidadAnual: fund.volatility, // use standard deviation volatility
-      perfilRiesgo: fund.riskRating >= 6 ? "agresivo" : fund.riskRating >= 5 ? "moderado" : "conservador"
-    });
+    setHasSimulated(false); // reset simulation when changing fund
   };
 
-  const formatPercent = (val: number) => {
-    return `${(val * 100).toFixed(2)}%`;
+  // Build simulation params from selected fund + local inputs
+  const computedParams = useMemo<SimulationParams>(() => {
+    if (!selectedFund) return params;
+    return {
+      capitalInicial: capInicial,
+      aportacionMensual: aporteMensual,
+      tiempoAnios: anios,
+      interesAnual: selectedFund.historicalReturn5Y,
+      inflacionAnual: 2.0,
+      volatilidadAnual: selectedFund.volatility,
+      perfilRiesgo: selectedFund.riskRating >= 6 ? "agresivo" : selectedFund.riskRating >= 5 ? "moderado" : "conservador"
+    };
+  }, [selectedFund, capInicial, aporteMensual, anios, params]);
+
+  const results = useMemo<SimulationResults | null>(() => {
+    if (!hasSimulated || !selectedFund) return null;
+    return ejecutarSimulacion(computedParams);
+  }, [computedParams, hasSimulated, selectedFund]);
+
+  const chartData = useMemo(() => {
+    if (!results) return [];
+    return results.serieEvolucion.map((item) => ({
+      year: `${item.year}a`,
+      Optimista: item.valorOptimista,
+      Medio: item.valorMedio,
+      Pesimista: item.valorPesimista,
+      Aportado: item.capitalAportado
+    }));
+  }, [results]);
+
+  const handleTriggerSimulation = () => {
+    if (!selectedFund) return;
+    setIsSimulating(true);
+    setSimulationProgress(20);
+    setTimeout(() => setSimulationProgress(60), 250);
+    setTimeout(() => setSimulationProgress(90), 500);
+    setTimeout(() => {
+      setIsSimulating(false);
+      setSimulationProgress(0);
+      setHasSimulated(true);
+      onSetParams(computedParams);
+    }, 750);
   };
 
-  const formatEuro = (val: number) => {
-    return new Intl.NumberFormat("es-ES", {
-      style: "currency",
-      currency: "EUR"
-    }).format(val);
-  };
+  const formatEuro = (val: number) =>
+    new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(val);
 
-  // Mock comparison chart historical Base 100 values
-  const relativeChartData = [
-    { year: "2019", "S&P 500": 100, "All-World": 100, "MSCI World": 100 },
-    { year: "2020", "S&P 500": 118, "All-World": 112, "MSCI World": 114 },
-    { year: "2021", "S&P 500": 142, "All-World": 128, "MSCI World": 131 },
-    { year: "2022", "S&P 500": 116, "All-World": 109, "MSCI World": 111 },
-    { year: "2023", "S&P 500": 146, "All-World": 131, "MSCI World": 134 },
-    { year: "HOY", "S&P 500": 188, "All-World": 162, "MSCI World": 165 }
-  ];
-
-  const handleExportCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Fondo,Ticker,ISIN,Rentabilidad 1A,Rentabilidad 5A Anualizada,TER,Volatilidad,Beta,SRRI\n";
-    filteredFunds.forEach((fund) => {
-      csvContent += `"${fund.name}",${fund.ticker},${fund.isin},${fund.historicalReturn1Y}%,${fund.historicalReturn5Y}%,${fund.ter * 100}%,${fund.volatility}%,${fund.beta},${fund.riskRating}/7\n`;
-    });
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "catalogo_fondos_portfoliolab.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setCopiedSuccess(true);
-    setTimeout(() => setCopiedSuccess(false), 2000);
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-[#171f33] border border-[#2d3449] p-3 rounded-xl shadow-xl font-mono text-xs text-[#dae2fd]">
+          <p className="font-bold mb-1 border-b border-slate-700 pb-1">Año {payload[0].payload.year.replace("a", "")}</p>
+          <p className="text-[#4edea3]">Optimista: {formatEuro(payload[0].value)}</p>
+          <p className="text-[#b4c5ff]">Medio: {formatEuro(payload[1].value)}</p>
+          <p className="text-[#ffb4ab]">Pesimista: {formatEuro(payload[2].value)}</p>
+          <p className="text-slate-400">Aportado: {formatEuro(payload[3].value)}</p>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-[#1e293b]/70">
         <div>
           <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
             Simulador de Fondos Indexados
           </h2>
           <p className="text-[#bbcabf] text-sm mt-1">
-            Proyecta tu patrimonio ideal invirtiendo en los fondos y ETFs globales de mayor capitalización
+            Selecciona un fondo, configura tu inversión y ejecuta la simulación Monte Carlo
           </p>
         </div>
         <div className="flex bg-[#131b2e] border border-[#2d3449] rounded-xl px-4 py-2.5 items-center gap-2">
           <Globe className="w-4 h-4 text-[#4edea3] flex-shrink-0 animate-pulse" />
           <span className="text-xs font-semibold text-[#bbcabf]">
-            Estado de los Mercados: <span className="text-[#4edea3]">ABIERTOS</span>
+            {CATALOG_FUNDS.length} fondos disponibles
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Funds List Catalog section */}
-        <div className="lg:col-span-8 space-y-6">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+
+        {/* LEFT: Fund list + filters */}
+        <div className="xl:col-span-4 space-y-4">
+          {/* Filters */}
+          <div className="glass-panel p-4 rounded-2xl">
+            <div className="flex items-center gap-2 mb-3">
+              <FolderOpen className="w-4 h-4 text-[#4edea3]" />
+              <span className="font-bold text-white text-sm">Catálogo de Fondos</span>
+            </div>
+            <select
+              value={selectedRegion}
+              onChange={(e) => setSelectedRegion(e.target.value)}
+              className="w-full bg-slate-900 border border-[#2d3449] text-xs px-3 py-2 rounded-lg text-[#bbcabf] focus:border-[#4edea3] focus:ring-1 focus:ring-[#4edea3] outline-none cursor-pointer"
+            >
+              <option>Todas las Regiones</option>
+              <option>EE.UU.</option>
+              <option>Global</option>
+              <option>Países Desarrollados</option>
+              <option>Emergentes</option>
+            </select>
+          </div>
+
+          {/* Fund list */}
+          <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+            {filteredFunds.map((fund) => {
+              const isSelected = selectedFund?.id === fund.id;
+              return (
+                <div
+                  key={fund.id}
+                  className={`border rounded-xl p-3.5 transition-all duration-200 cursor-pointer ${
+                    isSelected
+                      ? "bg-[#171f33] border-[#4edea3] shadow-md shadow-[#4edea3]/5"
+                      : "bg-slate-900/60 border-[#1e293b] hover:bg-slate-900 hover:border-slate-700"
+                  }`}
+                  onClick={() => handleSelectFund(fund)}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-bold text-[#dae2fd] text-sm leading-snug truncate">{fund.name}</h4>
+                      <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400 font-mono">
+                        <span>{fund.ticker}</span>
+                        <span>•</span>
+                        <span>TER {(fund.ter * 100).toFixed(2)}%</span>
+                        <span>•</span>
+                        <span>Riesgo {fund.riskRating}/7</span>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <span className="font-mono text-sm font-bold text-[#4edea3]">+{fund.historicalReturn5Y}%</span>
+                      <span className="text-[9px] text-slate-500 font-mono block">5A anualizado</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* CENTER+RIGHT: Simulator panel */}
+        <div className="xl:col-span-8 space-y-6">
+
+          {/* Selected Fund + Simulator Controls */}
           <div className="glass-panel p-5 rounded-2xl">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-              <h3 className="font-bold text-white text-lg flex items-center gap-2">
-                <FolderOpen className="w-5 h-5 text-[#4edea3]" />
-                <span>Catálogo de Fondos</span>
-              </h3>
-              
-              {/* Filter controls */}
-              <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                <select
-                  value={selectedRegion}
-                  onChange={(e) => setSelectedRegion(e.target.value)}
-                  className="bg-slate-900 border border-[#2d3449] text-xs px-3 py-1.5 rounded-lg text-[#bbcabf] focus:border-[#4edea3] focus:ring-1 focus:ring-[#4edea3] outline-none cursor-pointer"
-                >
-                  <option>Todas las Regiones</option>
-                  <option>EE.UU.</option>
-                  <option>Global</option>
-                  <option>Países Desarrollados</option>
-                  <option>Emergentes</option>
-                </select>
-
-                <select
-                  value={selectedAsset}
-                  onChange={(e) => setSelectedAsset(e.target.value)}
-                  className="bg-slate-900 border border-[#2d3449] text-xs px-3 py-1.5 rounded-lg text-[#bbcabf] focus:border-[#4edea3] focus:ring-1 focus:ring-[#4edea3] outline-none cursor-pointer"
-                >
-                  <option value="Todos">Todos los Activos</option>
-                  <option value="Renta Variable">Renta Variable (Acciones)</option>
-                </select>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-[#4edea3]/10 border border-[#4edea3]/20 flex items-center justify-center">
+                <Sliders className="w-5 h-5 text-[#4edea3]" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-base leading-tight">
+                  {selectedFund ? selectedFund.name : "Selecciona un fondo"}
+                </h3>
+                <p className="text-[#bbcabf] text-[11px]">
+                  {selectedFund
+                    ? `${selectedFund.ticker} • Rentabilidad ${selectedFund.historicalReturn5Y}% • Volatilidad ${selectedFund.volatility}%`
+                    : "Haz clic en un fondo de la lista para empezar"}
+                </p>
               </div>
             </div>
 
-            <div className="space-y-3.5">
-              {filteredFunds.map((fund) => {
-                const isSelected = selectedFund?.id === fund.id;
-                return (
-                  <div
-                    key={fund.id}
-                    className={`border rounded-xl p-4 transition-all duration-300 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 cursor-pointer hover:border-[#4edea3]/40 ${
-                      isSelected
-                        ? "bg-[#171f33]/90 border-[#4edea3] shadow-md shadow-[#4edea3]/5"
-                        : "bg-slate-900/60 border-[#1e293b] hover:bg-slate-900"
-                    }`}
-                    onClick={() => handleSelectFund(fund)}
-                  >
-                    <div className="min-w-0 flex-1 flex gap-3.5">
-                      <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700/60 flex-shrink-0 flex items-center justify-center text-slate-400">
-                        <TrendingUp className="w-5 h-5 text-slate-300" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-[#dae2fd] text-sm md:text-base leading-snug truncate">
-                            {fund.name}
-                          </h4>
-                          <span className="font-mono text-[9px] bg-slate-800 text-[#4edea3] font-bold px-1.5 py-0.5 rounded leading-none">
-                            {fund.ticker}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-[11px] text-slate-400 font-medium">
-                          <span className="font-mono">ISIN: {fund.isin}</span>
-                          <span className="flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3 text-[#ffb3af]" /> Riesgo: {fund.riskRating}/7
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Percent className="w-3.5 h-3.5" /> Comisión TER: {(fund.ter * 100).toFixed(2)}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto mt-2 sm:mt-0 pt-3 sm:pt-0 border-t border-slate-800 sm:border-0">
-                      <div className="text-left sm:text-right">
-                        <p className="font-mono text-sm md:text-base font-bold text-[#4edea3]">
-                          +{fund.historicalReturn1Y}%
-                        </p>
-                        <p className="text-[10px] text-slate-500 font-mono">Retorno 1 Año</p>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectFund(fund);
-                        }}
-                        className={`p-2 rounded-lg transition-all cursor-pointer ${
-                          isSelected
-                            ? "bg-[#4edea3] text-black"
-                            : "bg-[#4edea3]/10 text-[#4edea3] hover:bg-[#4edea3] hover:text-black"
-                        }`}
-                        title="Simular con este fondo indexado líder"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+            {/* Sliders grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+              {/* Capital Inicial */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#bbcabf] font-medium">Capital Inicial</span>
+                  <span className="text-[#4edea3] font-bold font-mono bg-[#4edea3]/10 px-2 py-0.5 rounded">{formatEuro(capInicial)}</span>
+                </div>
+                <input
+                  type="range" min={0} max={500000} step={5000}
+                  value={capInicial}
+                  onChange={(e) => { setCapInicial(Number(e.target.value)); setHasSimulated(false); }}
+                  className="w-full accent-[#4edea3] h-1.5 bg-[#2d3449] rounded-lg cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                  <span>0 €</span><span>500k €</span>
+                </div>
+              </div>
+
+              {/* Aportación Mensual */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#bbcabf] font-medium">Aportación Mensual</span>
+                  <span className="text-[#4edea3] font-bold font-mono bg-[#4edea3]/10 px-2 py-0.5 rounded">{formatEuro(aporteMensual)}</span>
+                </div>
+                <input
+                  type="range" min={0} max={5000} step={50}
+                  value={aporteMensual}
+                  onChange={(e) => { setAporteMensual(Number(e.target.value)); setHasSimulated(false); }}
+                  className="w-full accent-[#4edea3] h-1.5 bg-[#2d3449] rounded-lg cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                  <span>0 €</span><span>5.000 €</span>
+                </div>
+              </div>
+
+              {/* Horizonte */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#bbcabf] font-medium">Horizonte (Años)</span>
+                  <span className="text-[#4edea3] font-bold font-mono bg-[#4edea3]/10 px-2 py-0.5 rounded">{anios} años</span>
+                </div>
+                <input
+                  type="range" min={1} max={50} step={1}
+                  value={anios}
+                  onChange={(e) => { setAnios(Number(e.target.value)); setHasSimulated(false); }}
+                  className="w-full accent-[#4edea3] h-1.5 bg-[#2d3449] rounded-lg cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                  <span>1 año</span><span>50 años</span>
+                </div>
+              </div>
             </div>
+
+            {/* Simulate button */}
+            <button
+              onClick={handleTriggerSimulation}
+              disabled={isSimulating || !selectedFund}
+              className="w-full py-3.5 bg-[#4edea3] text-black font-extrabold text-xs tracking-wider uppercase rounded-xl hover:bg-[#3cd696] transition-all duration-300 shadow-lg shadow-[#4edea3]/15 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {isSimulating ? (
+                <>
+                  <Activity className="w-4 h-4 animate-spin" />
+                  <span>Simulando {simulationProgress}%...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>Ejecutar Simulación con {selectedFund?.ticker || "Fondo"}</span>
+                </>
+              )}
+            </button>
           </div>
 
-          {/* Historical line comparison chart BASE 100 */}
-          <div className="glass-panel p-5 rounded-2xl h-[360px] flex flex-col justify-between">
-            <div>
-              <h3 className="font-bold text-white text-base leading-tight">Comparativa Histórica</h3>
-              <p className="text-xs text-[#bbcabf] mt-0.5">Rentabilidad acumulativa relativa base 100 (Estilo Morningstar 5 años)</p>
-            </div>
-
-            <div className="flex-1 w-full min-h-0 mt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={relativeChartData} margin={{ top: 10, right: 10, left: -25, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2c354a" opacity={0.2} />
-                  <XAxis dataKey="year" stroke="#bbcabf" fontSize={10} tickLine={false} />
-                  <YAxis stroke="#bbcabf" fontSize={10} tickLine={false} />
-                  <Tooltip contentStyle={{ backgroundColor: "#171f33", borderColor: "#2d3449", color: "#dae2fd", fontSize: 11 }} />
-                  <Line type="monotone" dataKey="S&P 500" stroke="#4edea3" strokeWidth={2.5} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="All-World" stroke="#b4c5ff" strokeWidth={2} />
-                  <Line type="monotone" dataKey="MSCI World" stroke="#ffb3af" strokeWidth={1.5} strokeDasharray="3 3" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            
-            <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono mt-2 uppercase border-t border-slate-800 pt-3">
-              <span>Rendimiento Base 100</span>
-              <span>Análisis Geográfico de Diversificación</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Selected fund analytics sidebar detail */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="glass-panel p-5 rounded-2xl flex flex-col h-full bg-gradient-to-tr from-[#131b2e] to-[#171f33]">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="p-1 px-1.5 bg-[#4edea3]/10 text-[#4edea3] rounded-lg">
-                <Compass className="w-5 h-5" />
-              </span>
-              <h4 className="font-bold text-white text-base">Fondo de Interés</h4>
-            </div>
-
-            {selectedFund ? (
-              <div className="space-y-6 flex-1 flex flex-col justify-between">
-                <div>
-                  <h5 className="font-mono text-xs text-[#4edea3] uppercase tracking-widest leading-none font-bold">
-                    {selectedFund.ticker}
-                  </h5>
-                  <h3 className="text-lg font-bold text-white mt-1 border-b border-[#2d3449] pb-3 leading-snug">
-                    {selectedFund.name}
-                  </h3>
-
-                  <div className="space-y-3.5 mt-5">
-                    {/* Return metric 5Y */}
-                    <div className="flex justify-between text-xs pb-2 border-b border-slate-800">
-                      <span className="text-[#bbcabf]">ISIN Internacional</span>
-                      <span className="text-white font-mono font-bold">{selectedFund.isin}</span>
-                    </div>
-
-                    <div className="flex justify-between text-xs pb-2 border-b border-slate-800">
-                      <span className="text-[#bbcabf]">Comisión de Gestión (TER)</span>
-                      <span className="text-[#4edea3] font-bold font-mono">
-                        {(selectedFund.ter * 100).toFixed(2)}% anual
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between text-xs pb-2 border-b border-slate-800">
-                      <span className="text-[#bbcabf]">Retorno de Largo Plazo (5A)</span>
-                      <span className="text-[#4edea3] font-bold font-mono">
-                        +{selectedFund.historicalReturn5Y}% / año
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between text-xs pb-2 border-b border-slate-800">
-                      <span className="text-[#bbcabf]">Volatilidad Estimada</span>
-                      <span className="text-white font-mono font-bold">
-                        {selectedFund.volatility}% (Std Dev)
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between text-xs pb-2 border-b border-slate-800">
-                      <span className="text-[#bbcabf]">Beta de Mercado</span>
-                      <span className="text-white font-mono font-bold">{selectedFund.beta.toFixed(2)}</span>
-                    </div>
-
-                    <div className="flex justify-between text-xs">
-                      <span className="text-[#bbcabf]">Área Geográfica</span>
-                      <span className="text-white font-bold">{selectedFund.region}</span>
-                    </div>
+          {/* Results Section */}
+          {results ? (
+            <>
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="glass-panel p-4 rounded-2xl">
+                  <span className="text-[10px] font-semibold text-[#bbcabf] uppercase tracking-wider block mb-1">Patrimonio Final</span>
+                  <h3 className="text-xl font-bold text-[#4edea3] font-mono">{formatEuro(results.valorFinal)}</h3>
+                </div>
+                <div className="glass-panel p-4 rounded-2xl">
+                  <span className="text-[10px] font-semibold text-[#bbcabf] uppercase tracking-wider block mb-1">Capital Aportado</span>
+                  <h3 className="text-xl font-bold text-white font-mono">{formatEuro(results.capitalAportado)}</h3>
+                </div>
+                <div className="glass-panel p-4 rounded-2xl">
+                  <span className="text-[10px] font-semibold text-[#bbcabf] uppercase tracking-wider block mb-1">Ganancia Neta</span>
+                  <h3 className="text-xl font-bold text-[#b4c5ff] font-mono">{formatEuro(results.beneficiosNetos)}</h3>
+                </div>
+                <div className="glass-panel p-4 rounded-2xl">
+                  <span className="text-[10px] font-semibold text-[#bbcabf] uppercase tracking-wider block mb-1">Prob. Éxito</span>
+                  <h3 className="text-xl font-bold text-white font-mono">{results.probabilidadExito}%</h3>
+                  <div className="w-full bg-[#2d3449] h-1.5 rounded-full mt-2 overflow-hidden">
+                    <div className="bg-[#4edea3] h-full transition-all duration-1000" style={{ width: `${results.probabilidadExito}%` }} />
                   </div>
                 </div>
-
-                <div className="p-3.5 rounded-xl border border-dashed border-[#3c4a42] bg-[#4edea3]/5 text-[11px] text-[#bbcabf] leading-relaxed italic mt-4">
-                  "Sincronizado con el plan principal. Al seleccionar este fondo, se configuran las matemáticas
-                  de la simulación con la rentabilidad histórica anualizada (+{selectedFund.historicalReturn5Y}%)
-                  y la desviación estándar de volatilidad de esta clase de activo."
-                </div>
-
-                <button
-                  onClick={() => handleSelectFund(selectedFund)}
-                  className="w-full py-3.5 bg-[#4edea3] text-black font-extrabold text-xs tracking-wider uppercase rounded-xl hover:bg-[#3cd696] transition-all duration-300 mt-6 shadow-lg shadow-[#4edea3]/10"
-                >
-                  Sincronizar Simulador General
-                </button>
               </div>
-            ) : (
-              <div className="text-center py-10 text-slate-400 text-xs">
-                Por favor, elija un fondo del catálogo para inspeccionar.
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* Detailed information table */}
-      <div className="glass-panel rounded-2xl overflow-hidden mt-6">
-        <div className="p-5 border-b border-[#1e293b] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h3 className="font-bold text-white text-base">Ficha Técnica de Activos Disponibles</h3>
-            <p className="text-xs text-[#bbcabf] mt-0.5">Métricas de control registradas para integraciones</p>
-          </div>
-          <button
-            onClick={handleExportCSV}
-            className="text-xs bg-[#171f33] hover:bg-slate-800 border border-[#1e293b] py-2.5 px-4 rounded-xl font-bold flex items-center gap-2 cursor-pointer text-[#4edea3]"
-          >
-            <Download className="w-4 h-4" />
-            <span>{copiedSuccess ? "¡Descargado CSV!" : "Exportar Datos como CSV"}</span>
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse font-sans">
-            <thead>
-              <tr className="bg-[#171f33]/65 text-slate-400 border-b border-[#1e293b] uppercase tracking-wider font-semibold">
-                <th className="px-6 py-4">Fondo / ISIN</th>
-                <th className="px-6 py-4">Símbolo</th>
-                <th className="px-6 py-4">Rentabilidad Anual 5A</th>
-                <th className="px-6 py-4">Escala de Riesgo</th>
-                <th className="px-6 py-4">Comisión Gestión (TER)</th>
-                <th className="px-6 py-4">Volatilidad</th>
-                <th className="px-6 py-4">Beta</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/80">
-              {CATALOG_FUNDS.map((fund) => (
-                <tr key={fund.id} className="hover:bg-slate-800/20 transition-colors">
-                  <td className="px-6 py-4.5 font-bold text-white">
-                    <div>{fund.name}</div>
-                    <div className="text-[10px] text-slate-400 font-mono font-medium mt-0.5">{fund.isin}</div>
-                  </td>
-                  <td className="px-6 py-4.5 font-mono text-slate-300">{fund.ticker}</td>
-                  <td className="px-6 py-4.5 text-[#4edea3] font-bold font-mono">+{fund.historicalReturn5Y}%</td>
-                  <td className="px-6 py-4.5">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-800 text-white font-mono">
-                      SRRI {fund.riskRating}/7
+              {/* Chart */}
+              <div className="glass-panel rounded-2xl p-5 h-[380px] flex flex-col">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-white font-bold text-base">Proyección Monte Carlo</h3>
+                    <p className="text-[#bbcabf] text-xs mt-0.5">
+                      Basado en {selectedFund?.name} (+{selectedFund?.historicalReturn5Y}% anualizado)
+                    </p>
+                  </div>
+                  <div className="flex gap-3 font-mono text-[10px] uppercase font-semibold">
+                    <span className="flex items-center gap-1 text-[#4edea3]">
+                      <span className="w-2 h-2 rounded-full bg-[#4edea3] block" /> Optimista
                     </span>
-                  </td>
-                  <td className="px-6 py-4.5 font-mono">{(fund.ter * 100).toFixed(2)}%</td>
-                  <td className="px-6 py-4.5 font-mono">{fund.volatility}%</td>
-                  <td className="px-6 py-4.5 font-mono">{fund.beta.toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <span className="flex items-center gap-1 text-[#b4c5ff]">
+                      <span className="w-2 h-2 rounded-full bg-[#b4c5ff] block" /> Medio
+                    </span>
+                    <span className="flex items-center gap-1 text-[#ffb3af]">
+                      <span className="w-2 h-2 rounded-full bg-[#ffb3af] block" /> Pesimista
+                    </span>
+                  </div>
+                </div>
+                <div className="flex-1 w-full min-h-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                      <defs>
+                        <linearGradient id="fund_opt" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#4edea3" stopOpacity={0.12} />
+                          <stop offset="95%" stopColor="#4edea3" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#2c354a" opacity={0.2} />
+                      <XAxis dataKey="year" stroke="#bbcabf" fontSize={10} tickLine={false} />
+                      <YAxis stroke="#bbcabf" fontSize={10} tickLine={false}
+                        tickFormatter={(v) => {
+                          if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M €`;
+                          if (v >= 1000) return `${(v / 1000).toFixed(0)}k €`;
+                          return `${v}€`;
+                        }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Area type="monotone" dataKey="Optimista" stroke="#4edea3" strokeWidth={2} fillOpacity={1} fill="url(#fund_opt)" />
+                      <Area type="monotone" dataKey="Medio" stroke="#b4c5ff" strokeWidth={2} fill="none" />
+                      <Area type="monotone" dataKey="Pesimista" stroke="#ffb3af" strokeWidth={1.5} strokeDasharray="4 4" fill="none" />
+                      <Area type="monotone" dataKey="Aportado" stroke="#86948a" strokeWidth={1} fill="none" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="glass-panel rounded-2xl p-10 flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 rounded-full bg-[#4edea3]/10 flex items-center justify-center mb-4">
+                <TrendingUp className="w-8 h-8 text-[#4edea3] opacity-60" />
+              </div>
+              <p className="text-white font-bold text-lg mb-2">Selecciona un fondo y ejecuta la simulación</p>
+              <p className="text-[#bbcabf] text-sm max-w-md">
+                Elige un fondo de la lista, ajusta tu capital inicial, aportación mensual y horizonte temporal. Después pulsa "Ejecutar Simulación" para ver los resultados.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

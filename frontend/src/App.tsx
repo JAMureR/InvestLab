@@ -1,24 +1,18 @@
 import { useState } from "react";
-import { Search, Bell, HelpCircle, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 
 import { SimulationParams, ViewType } from "./types";
 import LandingPage from "./components/LandingPage";
 import Sidebar from "./components/Sidebar";
-import DashboardScreen from "./components/DashboardScreen";
 import SimuladorScreen from "./components/SimuladorScreen";
 import IndexadosScreen from "./components/IndexadosScreen";
 import RemuneradasScreen from "./components/RemuneradasScreen";
-import CarterasScreen from "./components/CarterasScreen";
-import ComparadorScreen from "./components/ComparadorScreen";
-import HistorialScreen from "./components/HistorialScreen";
-import ConfiguracionScreen from "./components/ConfiguracionScreen";
 
 export default function App() {
-  // Navigation states: default to LandingPage for a smooth first experience
   const [isLanding, setIsLanding] = useState(true);
-  const [activeView, setActiveView] = useState<ViewType>("dashboard");
+  const [activeView, setActiveView] = useState<ViewType>("simulador");
 
-  // Global simulation inputs synced across all active widgets
+  // Global simulation params (shared across screens if needed)
   const [params, setParams] = useState<SimulationParams>({
     capitalInicial: 20000,
     aportacionMensual: 400,
@@ -31,50 +25,34 @@ export default function App() {
 
   // Mobile navigation drawer toggle
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Router to render the current selected screen
   const renderViewContent = () => {
     switch (activeView) {
-      case "dashboard":
-        return (
-          <DashboardScreen
-            initialParams={params}
-            onSetParams={setParams}
-            onNavigate={(view) => setActiveView(view)}
-          />
-        );
       case "simulador":
         return <SimuladorScreen params={params} onSetParams={setParams} />;
       case "indexados":
         return <IndexadosScreen params={params} onSetParams={setParams} />;
       case "remuneradas":
         return <RemuneradasScreen params={params} onSetParams={setParams} />;
-      case "carteras":
-        return <CarterasScreen params={params} onSetParams={setParams} />;
-      case "comparador":
-        return <ComparadorScreen params={params} />;
-      case "historial":
-        return <HistorialScreen params={params} onLoadParams={setParams} />;
-      case "configuracion":
-        return <ConfiguracionScreen params={params} onSetParams={setParams} />;
       default:
-        return (
-          <DashboardScreen
-            initialParams={params}
-            onSetParams={setParams}
-            onNavigate={(view) => setActiveView(view)}
-          />
-        );
+        return <SimuladorScreen params={params} onSetParams={setParams} />;
     }
   };
 
   if (isLanding) {
-    return <LandingPage onEnterSimulator={() => setIsLanding(false)} />;
+    return (
+      <LandingPage
+        onEnterSimulator={(view) => {
+          setIsLanding(false);
+          if (view) setActiveView(view);
+        }}
+      />
+    );
   }
 
   return (
     <div className="min-h-screen bg-[#020617] text-[#dae2fd] flex font-sans">
-      {/* Side Navigation panel */}
       <Sidebar
         currentView={activeView}
         onChangeView={(view) => {
@@ -82,13 +60,14 @@ export default function App() {
           setMobileMenuOpen(false);
         }}
         onExit={() => setIsLanding(true)}
+        collapsed={sidebarCollapsed}
+        setCollapsed={setSidebarCollapsed}
       />
 
-      {/* Main Workspace Frame container */}
-      <div className="flex-1 min-w-0 md:pl-64 flex flex-col min-h-screen relative">
-        {/* Top Header Navbar */}
+      <div className={`flex-1 min-w-0 flex flex-col min-h-screen relative transition-all duration-300 ${
+        sidebarCollapsed ? "md:pl-20" : "md:pl-64"
+      }`}>
         <header className="sticky top-0 z-30 flex justify-between items-center h-16 px-6 bg-[#0b1326]/75 backdrop-blur-md border-b border-[#1e293b]/70 w-full">
-          {/* Mobile hamburger menu button */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -96,45 +75,24 @@ export default function App() {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="relative w-72 hidden sm:block">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 cursor-pointer" />
-              <input
-                type="text"
-                placeholder="Buscar fondos, activos o estrategias..."
-                className="w-full bg-[#131b2e] border border-[#2d3449] rounded-xl py-2 pl-10 pr-4 text-xs text-white placeholder:text-slate-400 focus:border-[#4edea3] focus:ring-1 focus:ring-[#4edea3] outline-none"
-              />
-            </div>
+            <h2 className="text-sm font-bold text-white hidden sm:block">
+              {activeView === "simulador" && "Simulador de Inversiones"}
+              {activeView === "indexados" && "Simulador de Fondos Indexados"}
+              {activeView === "remuneradas" && "Simulador de Cuentas Remuneradas"}
+            </h2>
           </div>
-
-          <div className="flex items-center gap-5">
-            {/* Action showcase element */}
-            <span className="hidden leading-none xs:inline-flex bg-[#4edea3]/10 border border-[#4edea3]/20 py-1.5 px-3 rounded-lg text-[10px] font-mono tracking-wide font-semibold text-[#4edea3] uppercase">
-              SEÑAL EN TIEMPO REAL
-            </span>
-
-            {/* Icons controls */}
-            <div className="flex items-center gap-3.5 text-slate-400">
-              <Bell className="w-4 h-5 hover:text-white transition-colors cursor-pointer" />
-              <HelpCircle className="w-5 h-5 hover:text-white transition-colors cursor-pointer" />
-            </div>
-          </div>
+          <span className="inline-flex bg-[#4edea3]/10 border border-[#4edea3]/20 py-1.5 px-3 rounded-lg text-[10px] font-mono tracking-wide font-semibold text-[#4edea3] uppercase">
+            INVESTLAB
+          </span>
         </header>
 
-        {/* Mobile menu view drawer overflow */}
         {mobileMenuOpen && (
           <div className="md:hidden fixed inset-0 top-16 bg-[#020617] z-40 p-4 border-t border-[#1e293b]/80 flex flex-col gap-2">
-            {(
-              [
-                { id: "dashboard", label: "Dashboard" },
-                { id: "simulador", label: "Simulador" },
-                { id: "indexados", label: "Fondos Indexados" },
-                { id: "remuneradas", label: "Cuentas Remuneradas" },
-                { id: "carteras", label: "Carteras" },
-                { id: "comparador", label: "Comparar" },
-                { id: "historial", label: "Historial" },
-                { id: "configuracion", label: "Configuración" }
-              ] as const
-            ).map((item) => (
+            {([
+              { id: "simulador", label: "Simulador de Inversiones" },
+              { id: "indexados", label: "Simulador de Fondos" },
+              { id: "remuneradas", label: "Simulador de Cuentas" }
+            ] as const).map((item) => (
               <button
                 key={item.id}
                 onClick={() => {
@@ -157,7 +115,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Active view workspace main render element */}
         <main className="flex-grow p-6 overflow-y-auto">
           <div className="max-w-[1400px] mx-auto min-h-0">
             {renderViewContent()}

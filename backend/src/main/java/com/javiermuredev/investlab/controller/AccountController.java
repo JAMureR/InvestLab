@@ -2,8 +2,8 @@ package com.javiermuredev.investlab.controller;
 
 import com.javiermuredev.investlab.model.RemuneratedAccount;
 import com.javiermuredev.investlab.repository.RemuneratedAccountRepository;
-import org.springframework.web.bind.RequestMapping;
-import org.springframework.web.bind.RestController;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.GetMapping;
 
 import java.util.List;

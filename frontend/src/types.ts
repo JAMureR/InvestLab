@@ -69,11 +69,6 @@ export interface PortfolioAllocation {
 }
 
 export type ViewType =
-  | "dashboard"
   | "simulador"
   | "indexados"
-  | "remuneradas"
-  | "carteras"
-  | "comparador"
-  | "historial"
-  | "configuracion";
+  | "remuneradas";

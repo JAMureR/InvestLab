@@ -1,8 +1,10 @@
 import { Play, TrendingUp, Cpu, BarChart3, LineChart, ShieldCheck, Zap } from "lucide-react";
 import { motion } from "motion/react";
 
+import { ViewType } from "../types";
+
 interface LandingPageProps {
-  onEnterSimulator: () => void;
+  onEnterSimulator: (view?: ViewType) => void;
 }
 
 export default function LandingPage({ onEnterSimulator }: LandingPageProps) {
@@ -30,17 +32,17 @@ export default function LandingPage({ onEnterSimulator }: LandingPageProps) {
         <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#10b981] to-[#4edea3] flex items-center justify-center font-bold text-black text-xl shadow-lg shadow-[#4edea3]/20">
-              P
+              I
             </div>
             <div>
               <span className="font-extrabold text-2xl tracking-tight text-white font-sans">
-                Portfolio<span className="text-[#4edea3]">Lab</span>
+                Invest<span className="text-[#4edea3]">Lab</span>
               </span>
               <p className="text-[10px] text-[#bbcabf] font-mono leading-none tracking-widest uppercase">FINTECH SIMULATOR</p>
             </div>
           </div>
           <button
-            onClick={onEnterSimulator}
+            onClick={() => onEnterSimulator("simulador")}
             className="flex items-center gap-2 bg-[#4edea3] text-[#002113] hover:bg-[#3cd696] font-bold py-2.5 px-6 rounded-xl transition-all shadow-lg shadow-[#4edea3]/15 hover:scale-[1.02] cursor-pointer"
           >
             <Play className="w-4 h-4 fill-current" />
@@ -94,14 +96,14 @@ export default function LandingPage({ onEnterSimulator }: LandingPageProps) {
             className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center"
           >
             <button
-              onClick={onEnterSimulator}
+              onClick={() => onEnterSimulator("simulador")}
               className="w-full sm:w-auto flex items-center justify-center gap-3 bg-[#4edea3] text-black font-extrabold py-4 px-10 rounded-2xl text-lg hover:bg-[#3cd696] transition-all shadow-xl shadow-[#4edea3]/20 hover:scale-[1.03] cursor-pointer"
             >
               <BarChart3 className="w-5 h-5" />
               <span>Ejecutar Simulador Profesional</span>
             </button>
             <button
-              onClick={onEnterSimulator}
+              onClick={() => onEnterSimulator("indexados")}
               className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#171f33] border border-[#1E293B] text-white hover:text-[#4edea3] font-semibold py-4 px-8 rounded-2xl text-base hover:bg-[#222a3d] transition-all cursor-pointer"
             >
               <span>Ver Catálogo de Fondos</span>
@@ -122,7 +124,10 @@ export default function LandingPage({ onEnterSimulator }: LandingPageProps) {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Card 1 */}
-            <div className="glass-panel p-8 rounded-2xl hover:border-[#4edea3]/40 transition-all duration-300 relative group">
+            <div
+              onClick={() => onEnterSimulator("simulador")}
+              className="glass-panel p-8 rounded-2xl hover:border-[#4edea3]/40 hover:scale-[1.02] transition-all duration-300 relative group cursor-pointer"
+            >
               <div className="w-12 h-12 rounded-xl bg-[#4edea3]/10 flex items-center justify-center text-[#4edea3] mb-6">
                 <Cpu className="w-6 h-6" />
               </div>
@@ -136,7 +141,10 @@ export default function LandingPage({ onEnterSimulator }: LandingPageProps) {
             </div>
 
             {/* Card 2 */}
-            <div className="glass-panel p-8 rounded-2xl hover:border-[#4edea3]/40 transition-all duration-300 relative group">
+            <div
+              onClick={() => onEnterSimulator("indexados")}
+              className="glass-panel p-8 rounded-2xl hover:border-[#4edea3]/40 hover:scale-[1.02] transition-all duration-300 relative group cursor-pointer"
+            >
               <div className="w-12 h-12 rounded-xl bg-[#b4c5ff]/10 flex items-center justify-center text-[#b4c5ff] mb-6">
                 <LineChart className="w-6 h-6" />
               </div>
@@ -150,7 +158,10 @@ export default function LandingPage({ onEnterSimulator }: LandingPageProps) {
             </div>
 
             {/* Card 3 */}
-            <div className="glass-panel p-8 rounded-2xl hover:border-[#4edea3]/40 transition-all duration-300 relative group">
+            <div
+              onClick={() => onEnterSimulator("remuneradas")}
+              className="glass-panel p-8 rounded-2xl hover:border-[#4edea3]/40 hover:scale-[1.02] transition-all duration-300 relative group cursor-pointer"
+            >
               <div className="w-12 h-12 rounded-xl bg-[#ffb3af]/10 flex items-center justify-center text-[#ffb3af] mb-6">
                 <ShieldCheck className="w-6 h-6" />
               </div>
@@ -194,7 +205,7 @@ export default function LandingPage({ onEnterSimulator }: LandingPageProps) {
               </ul>
               <div className="pt-4">
                 <button
-                  onClick={onEnterSimulator}
+                  onClick={() => onEnterSimulator("simulador")}
                   className="bg-transparent hover:bg-white/5 border border-[#1E293B] text-white hover:text-[#4edea3] font-bold py-3 px-6 rounded-xl transition-all cursor-pointer"
                 >
                   Entrar a la Aplicación Gratuita
@@ -246,7 +257,7 @@ export default function LandingPage({ onEnterSimulator }: LandingPageProps) {
       <footer className="border-t border-[#1E293B] bg-[#060e20] text-[#bbcabf] text-xs py-10 mt-auto">
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-white font-bold text-sm">PortfolioLab</span>
+            <span className="text-white font-bold text-sm">InvestLab</span>
             <span className="text-[#3c4a42]">|</span>
             <span>Planificador de inversiones libre de costes en español.</span>
           </div>
