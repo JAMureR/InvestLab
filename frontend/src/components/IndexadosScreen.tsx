@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   TrendingUp,
   Globe,
@@ -16,6 +16,7 @@ import {
 import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
 import { IndexFund, SimulationParams, SimulationResults } from "../types";
 import { CATALOG_FUNDS, ejecutarSimulacion } from "../utils/finance";
+import { getFunds } from "../utils/api";
 import SavedSimulationsPanel from "./SavedSimulationsPanel";
 
 interface IndexadosScreenProps {
@@ -25,6 +26,7 @@ interface IndexadosScreenProps {
 
 export default function IndexadosScreen({ params, onSetParams }: IndexadosScreenProps) {
   const [selectedRegion, setSelectedRegion] = useState("Todas las Regiones");
+  const [fundsList, setFundsList] = useState<IndexFund[]>(CATALOG_FUNDS);
   const [selectedFund, setSelectedFund] = useState<IndexFund | null>(CATALOG_FUNDS[0]);
 
   // Local simulator inputs
@@ -37,12 +39,43 @@ export default function IndexadosScreen({ params, onSetParams }: IndexadosScreen
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationProgress, setSimulationProgress] = useState(0);
 
+  // Fetch dynamic catalog
+  useEffect(() => {
+    getFunds()
+      .then(data => {
+        const mapped: IndexFund[] = data.map(f => ({
+          id: f.id || "",
+          name: f.name,
+          ticker: f.ticker,
+          isin: f.isin,
+          historicalReturn1Y: f.historicalReturn1Y,
+          historicalReturn5Y: f.historicalReturn5Y,
+          riskRating: f.riskRating,
+          ter: f.ter,
+          region: f.region,
+          category: f.category,
+          volatility: f.volatility,
+          beta: f.beta
+        }));
+        if (mapped.length > 0) {
+          setFundsList(mapped);
+          setSelectedFund(prev => {
+            const found = mapped.find(x => x.id === prev?.id);
+            return found || mapped[0];
+          });
+        }
+      })
+      .catch(() => {
+        // Fallback is implicit
+      });
+  }, []);
+
   // Filter logic
   const filteredFunds = useMemo(() => {
-    return CATALOG_FUNDS.filter((fund) => {
+    return fundsList.filter((fund) => {
       return selectedRegion === "Todas las Regiones" || fund.region.toLowerCase() === selectedRegion.toLowerCase();
     });
-  }, [selectedRegion]);
+  }, [selectedRegion, fundsList]);
 
   const handleSelectFund = (fund: IndexFund) => {
     setSelectedFund(fund);
@@ -126,7 +159,7 @@ export default function IndexadosScreen({ params, onSetParams }: IndexadosScreen
         <div className="flex bg-[#131b2e] border border-[#2d3449] rounded-xl px-4 py-2.5 items-center gap-2">
           <Globe className="w-4 h-4 text-[#4edea3] flex-shrink-0 animate-pulse" />
           <span className="text-xs font-semibold text-[#bbcabf]">
-            {CATALOG_FUNDS.length} fondos disponibles
+            {fundsList.length} fondos disponibles
           </span>
         </div>
       </div>

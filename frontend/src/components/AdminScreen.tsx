@@ -14,7 +14,9 @@ import {
   createUser,
   updateUser,
   deleteUser,
-  getStoredUser
+  getStoredUser,
+  getFunds,
+  getAccounts
 } from "../utils/api";
 
 export default function AdminScreen() {
@@ -82,15 +84,11 @@ export default function AdminScreen() {
     setLoading(true);
     setError(null);
     try {
-      const fundsRes = await fetch("http://localhost:8080/api/funds");
-      const accountsRes = await fetch("http://localhost:8080/api/accounts");
+      const fundsData = await getFunds();
+      const accountsData = await getAccounts();
       
-      if (!fundsRes.ok || !accountsRes.ok) {
-        throw new Error("No se pudo cargar el catálogo de productos");
-      }
-      
-      setFunds(await fundsRes.json());
-      setAccounts(await accountsRes.json());
+      setFunds(fundsData);
+      setAccounts(accountsData);
       
       // Fetch users list
       const usersData = await getUsers();

@@ -92,6 +92,28 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalP
             </p>
           </div>
 
+          {/* Demo Credentials Info Card */}
+          {mode === "login" && (
+            <div className="mb-6 p-4 bg-slate-900/60 border border-[#2d3449]/60 rounded-2xl space-y-2">
+              <p className="text-[10px] font-bold text-[#4edea3] uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#4edea3] animate-pulse" />
+                Acceso Rápido para Pruebas:
+              </p>
+              <div className="grid grid-cols-2 gap-3 text-[11px] leading-relaxed">
+                <div className="bg-[#1e293b]/40 p-2.5 rounded-xl border border-[#2d3449]/50">
+                  <p className="font-semibold text-red-400 text-[10px] uppercase">Administrador</p>
+                  <p className="text-slate-400 font-mono mt-1 text-[10px]">usuario: <span className="text-white font-bold select-all">admin</span></p>
+                  <p className="text-slate-400 font-mono text-[10px]">pass: <span className="text-white font-bold select-all">admin123</span></p>
+                </div>
+                <div className="bg-[#1e293b]/40 p-2.5 rounded-xl border border-[#2d3449]/50">
+                  <p className="font-semibold text-blue-400 text-[10px] uppercase">Usuario Estándar</p>
+                  <p className="text-slate-400 font-mono mt-1 text-[10px]">usuario: <span className="text-white font-bold select-all">usuario</span></p>
+                  <p className="text-slate-400 font-mono text-[10px]">pass: <span className="text-white font-bold select-all">usuario123</span></p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Error */}
           {error && (
             <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm font-medium">

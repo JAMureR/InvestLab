@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Coins,
   ShieldCheck,
@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { RemuneratedAccount, SimulationParams } from "../types";
 import { CATALOG_ACCOUNTS } from "../utils/finance";
+import { getAccounts } from "../utils/api";
 import SavedSimulationsPanel from "./SavedSimulationsPanel";
 
 interface RemuneradasScreenProps {
@@ -18,6 +19,7 @@ interface RemuneradasScreenProps {
 }
 
 export default function RemuneradasScreen({ params, onSetParams }: RemuneradasScreenProps) {
+  const [accountsList, setAccountsList] = useState<RemuneratedAccount[]>(CATALOG_ACCOUNTS);
   const [selectedAcc, setSelectedAcc] = useState<RemuneratedAccount | null>(CATALOG_ACCOUNTS[0]);
 
   // Local simulator inputs
@@ -29,6 +31,32 @@ export default function RemuneradasScreen({ params, onSetParams }: RemuneradasSc
   const [hasSimulated, setHasSimulated] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationProgress, setSimulationProgress] = useState(0);
+
+  // Fetch dynamic catalog
+  useEffect(() => {
+    getAccounts()
+      .then(data => {
+        const mapped: RemuneratedAccount[] = data.map(a => ({
+          id: a.id || "",
+          name: a.name,
+          percentageTAE: a.percentageTAE,
+          payoutFrequency: a.payoutFrequency as any,
+          liquidity: a.liquidity,
+          riskRating: a.riskRating,
+          conditions: a.conditions
+        }));
+        if (mapped.length > 0) {
+          setAccountsList(mapped);
+          setSelectedAcc(prev => {
+            const found = mapped.find(x => x.id === prev?.id);
+            return found || mapped[0];
+          });
+        }
+      })
+      .catch(() => {
+        // Fallback is implicit
+      });
+  }, []);
 
   const handleSelectAccount = (account: RemuneratedAccount) => {
     setSelectedAcc(account);
@@ -153,7 +181,7 @@ export default function RemuneradasScreen({ params, onSetParams }: RemuneradasSc
         <div className="flex bg-[#131b2e] border border-[#2d3449] rounded-xl px-4 py-2.5 items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-[#ffb3af] flex-shrink-0" />
           <span className="text-xs font-semibold text-[#bbcabf]">
-            {CATALOG_ACCOUNTS.length} cuentas disponibles
+            {accountsList.length} cuentas disponibles
           </span>
         </div>
       </div>
@@ -170,7 +198,7 @@ export default function RemuneradasScreen({ params, onSetParams }: RemuneradasSc
           </div>
 
           <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-            {CATALOG_ACCOUNTS.map((acc) => {
+            {accountsList.map((acc) => {
               const isSelected = selectedAcc?.id === acc.id;
               return (
                 <div
