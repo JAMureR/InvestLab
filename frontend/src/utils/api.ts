@@ -40,6 +40,7 @@ export interface AuthUser {
   token: string;
   username: string;
   email: string;
+  role: string;
 }
 
 export async function login(username: string, password: string): Promise<AuthUser> {
@@ -55,7 +56,7 @@ export async function login(username: string, password: string): Promise<AuthUse
 
   const data = await res.json();
   localStorage.setItem('investlab_token', data.token);
-  localStorage.setItem('investlab_user', JSON.stringify({ username: data.username, email: data.email }));
+  localStorage.setItem('investlab_user', JSON.stringify({ username: data.username, email: data.email, role: data.role }));
   return data;
 }
 
@@ -73,7 +74,7 @@ export async function register(username: string, email: string, password: string
 
   const data = await res.json();
   localStorage.setItem('investlab_token', data.token);
-  localStorage.setItem('investlab_user', JSON.stringify({ username: data.username, email: data.email }));
+  localStorage.setItem('investlab_user', JSON.stringify({ username: data.username, email: data.email, role: data.role }));
   return data;
 }
 
@@ -82,7 +83,7 @@ export function logout(): void {
   localStorage.removeItem('investlab_user');
 }
 
-export function getStoredUser(): { username: string; email: string } | null {
+export function getStoredUser(): { username: string; email: string; role?: string } | null {
   const raw = localStorage.getItem('investlab_user');
   if (!raw) return null;
   try {
@@ -152,4 +153,94 @@ export async function deleteSimulation(id: number): Promise<void> {
     method: 'DELETE',
   });
   if (!res.ok) throw new Error('Error al eliminar simulación');
+}
+
+// ===== ADMIN PRODUCT CRUD =====
+
+export interface IndexFundDTO {
+  id?: string;
+  name: string;
+  ticker: string;
+  isin: string;
+  historicalReturn1Y: number;
+  historicalReturn5Y: number;
+  riskRating: number;
+  ter: number;
+  region: string;
+  category: string;
+  volatility: number;
+  beta: number;
+}
+
+export interface RemuneratedAccountDTO {
+  id?: string;
+  name: string;
+  percentageTAE: number;
+  payoutFrequency: string;
+  liquidity: string;
+  riskRating: number;
+  logoUrl?: string | null;
+  conditions: string;
+}
+
+export async function createFund(payload: IndexFundDTO): Promise<IndexFundDTO> {
+  const res = await fetchWithAuth('/funds', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || 'Error al crear fondo indexado');
+  }
+  return res.json();
+}
+
+export async function updateFund(id: string, payload: IndexFundDTO): Promise<IndexFundDTO> {
+  const res = await fetchWithAuth(`/funds/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || 'Error al actualizar fondo indexado');
+  }
+  return res.json();
+}
+
+export async function deleteFund(id: string): Promise<void> {
+  const res = await fetchWithAuth(`/funds/${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error('Error al eliminar fondo indexado');
+}
+
+export async function createAccount(payload: RemuneratedAccountDTO): Promise<RemuneratedAccountDTO> {
+  const res = await fetchWithAuth('/accounts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || 'Error al crear cuenta remunerada');
+  }
+  return res.json();
+}
+
+export async function updateAccount(id: string, payload: RemuneratedAccountDTO): Promise<RemuneratedAccountDTO> {
+  const res = await fetchWithAuth(`/accounts/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || 'Error al actualizar cuenta remunerada');
+  }
+  return res.json();
+}
+
+export async function deleteAccount(id: string): Promise<void> {
+  const res = await fetchWithAuth(`/accounts/${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error('Error al eliminar cuenta remunerada');
 }

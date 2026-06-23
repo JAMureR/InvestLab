@@ -4,7 +4,7 @@ import { X, LogIn, UserPlus, Eye, EyeOff, Loader2 } from "lucide-react";
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAuthSuccess: (user: { username: string; email: string }) => void;
+  onAuthSuccess: (user: { username: string; email: string; role: string }) => void;
 }
 
 import { login, register } from "../utils/api";
@@ -36,10 +36,10 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalP
     try {
       if (mode === "login") {
         const data = await login(username, password);
-        onAuthSuccess({ username: data.username, email: data.email });
+        onAuthSuccess({ username: data.username, email: data.email, role: data.role });
       } else {
         const data = await register(username, email, password);
-        onAuthSuccess({ username: data.username, email: data.email });
+        onAuthSuccess({ username: data.username, email: data.email, role: data.role });
       }
       resetForm();
       onClose();

@@ -20,15 +20,24 @@ public class JwtUtil {
     private long expirationMs;
 
     /**
-     * Genera un token JWT firmado con el username como subject.
+     * Genera un token JWT firmado con el username como subject y el rol como claim.
      */
-    public String generateToken(String username) {
+    public String generateToken(String username, String role) {
         return JWT.create()
                 .withSubject(username)
+                .withClaim("role", role)
                 .withIssuedAt(new Date())
                 .withExpiresAt(new Date(System.currentTimeMillis() + expirationMs))
                 .withIssuer("investlab-api")
                 .sign(Algorithm.HMAC256(secret));
+    }
+
+    /**
+     * Extrae el rol de un token válido.
+     */
+    public String extractRole(String token) {
+        DecodedJWT jwt = verifyToken(token);
+        return jwt.getClaim("role").asString();
     }
 
     /**

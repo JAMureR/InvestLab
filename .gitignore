@@ -22,3 +22,7 @@ frontend/coverage/
 *.sw?
 .DS_Store
 *.log
+
+# H2 Database
+backend/data/
+*.db

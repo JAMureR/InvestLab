@@ -43,8 +43,8 @@ public class AuthService {
 
         userRepository.save(user);
 
-        String token = jwtUtil.generateToken(user.getUsername());
-        return new AuthResponse(token, user.getUsername(), user.getEmail());
+        String token = jwtUtil.generateToken(user.getUsername(), user.getRole());
+        return new AuthResponse(token, user.getUsername(), user.getEmail(), user.getRole());
     }
 
     /**
@@ -59,7 +59,7 @@ public class AuthService {
             throw new IllegalArgumentException("Usuario o contraseña incorrectos");
         }
 
-        String token = jwtUtil.generateToken(user.getUsername());
-        return new AuthResponse(token, user.getUsername(), user.getEmail());
+        String token = jwtUtil.generateToken(user.getUsername(), user.getRole());
+        return new AuthResponse(token, user.getUsername(), user.getEmail(), user.getRole());
     }
 }

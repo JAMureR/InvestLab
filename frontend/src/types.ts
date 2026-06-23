@@ -71,4 +71,5 @@ export interface PortfolioAllocation {
 export type ViewType =
   | "simulador"
   | "indexados"
-  | "remuneradas";
+  | "remuneradas"
+  | "admin";

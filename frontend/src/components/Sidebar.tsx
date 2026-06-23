@@ -6,7 +6,8 @@ import {
   ChevronRight,
   LogOut,
   LogIn,
-  User
+  User,
+  Shield
 } from "lucide-react";
 import { ViewType } from "../types";
 
@@ -16,7 +17,7 @@ interface SidebarProps {
   onExit: () => void;
   collapsed: boolean;
   setCollapsed: (collapsed: boolean) => void;
-  user: { username: string; email: string } | null;
+  user: { username: string; email: string; role?: string } | null;
   onLoginClick: () => void;
   onLogout: () => void;
 }
@@ -32,10 +33,11 @@ export default function Sidebar({
   onLogout
 }: SidebarProps) {
   const menuItems = [
-    { id: "simulador", label: "Simulador Inversiones", icon: LineChart },
-    { id: "indexados", label: "Fondos Indexados", icon: TrendingUp },
-    { id: "remuneradas", label: "Cuentas Remuneradas", icon: Coins }
-  ] as const;
+    { id: "simulador" as const, label: "Simulador Inversiones", icon: LineChart },
+    { id: "indexados" as const, label: "Fondos Indexados", icon: TrendingUp },
+    { id: "remuneradas" as const, label: "Cuentas Remuneradas", icon: Coins },
+    ...(user?.role === "ROLE_ADMIN" ? [{ id: "admin" as const, label: "Administración", icon: Shield }] : [])
+  ];
 
   return (
     <aside

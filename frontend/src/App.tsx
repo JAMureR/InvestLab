@@ -9,13 +9,14 @@ import SimuladorScreen from "./components/SimuladorScreen";
 import IndexadosScreen from "./components/IndexadosScreen";
 import RemuneradasScreen from "./components/RemuneradasScreen";
 import AuthModal from "./components/AuthModal";
+import AdminScreen from "./components/AdminScreen";
 
 export default function App() {
   const [isLanding, setIsLanding] = useState(true);
   const [activeView, setActiveView] = useState<ViewType>("simulador");
 
   // Auth state
-  const [user, setUser] = useState<{ username: string; email: string } | null>(getStoredUser());
+  const [user, setUser] = useState<{ username: string; email: string; role?: string } | null>(getStoredUser());
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Listen for auth expiration events (from api.ts)
@@ -47,7 +48,7 @@ export default function App() {
     setUser(null);
   };
 
-  const handleAuthSuccess = (userData: { username: string; email: string }) => {
+  const handleAuthSuccess = (userData: { username: string; email: string; role: string }) => {
     setUser(userData);
   };
 
@@ -59,6 +60,8 @@ export default function App() {
         return <IndexadosScreen params={params} onSetParams={setParams} />;
       case "remuneradas":
         return <RemuneradasScreen params={params} onSetParams={setParams} />;
+      case "admin":
+        return user?.role === "ROLE_ADMIN" ? <AdminScreen /> : <SimuladorScreen params={params} onSetParams={setParams} />;
       default:
         return <SimuladorScreen params={params} onSetParams={setParams} />;
     }
@@ -113,6 +116,7 @@ export default function App() {
               {activeView === "simulador" && "Simulador de Inversiones"}
               {activeView === "indexados" && "Simulador de Fondos Indexados"}
               {activeView === "remuneradas" && "Simulador de Cuentas Remuneradas"}
+              {activeView === "admin" && "Panel de Administración"}
             </h2>
           </div>
           <div className="flex items-center gap-3">
@@ -137,10 +141,11 @@ export default function App() {
         {mobileMenuOpen && (
           <div className="md:hidden fixed inset-0 top-16 bg-[#020617] z-40 p-4 border-t border-[#1e293b]/80 flex flex-col gap-2">
             {([
-              { id: "simulador", label: "Simulador de Inversiones" },
-              { id: "indexados", label: "Simulador de Fondos" },
-              { id: "remuneradas", label: "Simulador de Cuentas" }
-            ] as const).map((item) => (
+              { id: "simulador" as const, label: "Simulador de Inversiones" },
+              { id: "indexados" as const, label: "Simulador de Fondos" },
+              { id: "remuneradas" as const, label: "Simulador de Cuentas" },
+              ...(user?.role === "ROLE_ADMIN" ? [{ id: "admin" as const, label: "Administración" }] : [])
+            ]).map((item) => (
               <button
                 key={item.id}
                 onClick={() => {

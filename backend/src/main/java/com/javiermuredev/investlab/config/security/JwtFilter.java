@@ -13,6 +13,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 /**
  * Filtro que intercepta cada petición HTTP, extrae el JWT de la cabecera
@@ -42,11 +44,11 @@ public class JwtFilter extends OncePerRequestFilter {
             if (jwtUtil.isTokenValid(token)) {
                 String username = jwtUtil.extractUsername(token);
 
-                // Verificar que el usuario sigue existiendo en la base de datos
                 userRepository.findByUsername(username).ifPresent(user -> {
+                    SimpleGrantedAuthority authority = new SimpleGrantedAuthority(user.getRole());
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
-                                    user, null, Collections.emptyList()
+                                    user, null, List.of(authority)
                             );
                     authentication.setDetails(
                             new WebAuthenticationDetailsSource().buildDetails(request)
